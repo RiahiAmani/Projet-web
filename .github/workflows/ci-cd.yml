@@ -1,0 +1,66 @@
+name: CI-CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  # ======================
+  # 🧪 CI (Build + Test)
+  # ======================
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------- FRONTEND --------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend/my-app
+        run: npm install
+
+      - name: Build frontend
+        working-directory: ./frontend/my-app
+        run: npm run build
+
+      # -------- BACKEND --------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          pip install -r requirements.txt
+
+      - name: Django check
+        working-directory: ./backend
+        run: python manage.py check
+
+
+  # ======================
+  # 🚀 CD (Deploy)
+  # ======================
+  cd:
+    runs-on: ubuntu-latest
+    needs: ci   # 👈 IMPORTANT : CD seulement si CI réussit
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd developpement_web
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
